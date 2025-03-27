@@ -1,20 +1,58 @@
 import streamlit as st
 import os
-import google.generativeai as genai
+import fitz as pymupdf
+from docx import Document
 from dotenv import load_dotenv
+import google.generativeai as genai
 
 # Load environment variables
 load_dotenv()
 genai_api_key = os.getenv("GEMINI_API_KEY")
 
-# Verify API Key
 if not genai_api_key:
     st.error("GEMINI_API_KEY not found. Please check your .env file.")
     st.stop()
 
-# Set up the Gemini API client
 genai.configure(api_key=genai_api_key)
 model = genai.GenerativeModel("gemini-1.5-flash")
+
+# Helper functions
+def extract_text_from_pdf(pdf_path):
+    try:
+        doc = pymupdf.open(pdf_path)
+        text = ''
+        for page in doc:
+            text += page.get_text()
+        return text
+    except Exception as e:
+        return f"Error reading PDF ({pdf_path}): {str(e)}"
+
+def extract_text_from_docx(docx_path):
+    try:
+        doc = Document(docx_path)
+        return "\n".join([para.text for para in doc.paragraphs])
+    except Exception as e:
+        return f"Error reading DOCX ({docx_path}): {str(e)}"
+
+def load_reference_materials(folder_path):
+    reference_texts = []
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        if filename.lower().endswith('.pdf'):
+            text = extract_text_from_pdf(file_path)
+        elif filename.lower().endswith(('.txt', '.md')):
+            with open(file_path, 'r', encoding='utf-8') as file:
+                text = file.read()
+        elif filename.lower().endswith('.docx'):
+            text = extract_text_from_docx(file_path)
+        else:
+            continue
+        reference_texts.append(f"Document: {filename}\n{text}\n\n")
+    return "\n".join(reference_texts)
+
+# Load reference materials
+reference_materials_folder = 'reference_materials'
+reference_content = load_reference_materials(reference_materials_folder)
 
 # Streamlit page setup
 st.set_page_config(page_title="Lesson Blueprint Generator", layout="centered")
@@ -25,8 +63,11 @@ lesson_info = st.text_area("Enter Lesson Information (title, description, lesson
 additional_resources = st.text_area("Enter Additional Resources (optional):")
 
 # Instruction prompt
-def create_lesson_blueprint(lesson_info, additional_resources):
+def create_lesson_blueprint(lesson_info, additional_resources, reference_content):
     prompt = f"""
+    ### Reference Materials
+    {reference_content}
+
     ### Context
     You are an AI instructional designer creating detailed lesson blueprints for middle and high school social studies lessons.
 
@@ -105,7 +146,8 @@ if st.button("Generate Lesson Blueprint"):
         st.warning("Please enter lesson information to generate content.")
     else:
         with st.spinner("Generating lesson blueprint..."):
-            blueprint_output = create_lesson_blueprint(lesson_info, additional_resources)
+            blueprint_output = create_lesson_blueprint(lesson_info, additional_resources, reference_content)
+
 
         st.subheader("Generated Lesson Blueprint")
         st.write(blueprint_output)
