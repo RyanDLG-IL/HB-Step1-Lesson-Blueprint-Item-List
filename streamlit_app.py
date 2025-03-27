@@ -14,7 +14,10 @@ if not genai_api_key:
     st.stop()
 
 genai.configure(api_key=genai_api_key)
-model = genai.GenerativeModel("gemini-1.5-flash")
+# Existing model for generating lesson blueprints
+blueprint_model = genai.GenerativeModel("gemini-1.5-flash")
+# New model instance for generating assessment items (change model name as needed)
+assessment_model = genai.GenerativeModel("gemini-1.5-flash")
 
 # Helper functions
 def extract_text_from_pdf(pdf_path):
@@ -62,7 +65,7 @@ st.title("Lesson Blueprint Generator")
 lesson_info = st.text_area("Enter Lesson Information (title, description, lesson question, and learning objectives):")
 additional_resources = st.text_area("Enter Additional Resources (optional):")
 
-# Instruction prompt
+# Instruction prompt for Lesson Blueprint Generation
 def create_lesson_blueprint(lesson_info, additional_resources, reference_content):
     prompt = f"""
     ### Reference Materials
@@ -130,24 +133,65 @@ def create_lesson_blueprint(lesson_info, additional_resources, reference_content
 
     **Additional Notes**  
     - Recommendations for extension activities, multimedia resources, or formative assessment practices.
-
-
     """
-
     try:
-        response = model.generate_content(prompt)
+        response = blueprint_model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
         return f"Error generating content: {str(e)}"
 
-# Generate button
+# Instruction prompt for Assessment Items Generation
+def create_assessment_items(blueprint):
+    prompt = f"""
+    Using the following Lesson Blueprint, generate a series of assessment items that align with the lesson's learning objectives.
+
+    Multiple-choice items will consist of 4 answer choices. Only 1 answer choice should be correct. Incorrect options should be based on common misconceptions or misunderstandings. Incorrect choices should seem probable and should not be wildly incorrect. All answer choices should be parallel in style and should be roughly the same length. 
+
+    Multiple-select items will consist of 5 answer choices. 2-3 choices should be correct. Incorrect options should be based on common misconceptions or misunderstandings. Incorrect choices should seem probable and should not be wildly incorrect. All answer choices should be parallel in style and should be roughly the same length. 
+
+    All question items should include a hint feedback item for students who may make an incorrect selection. 
+
+    All question items should identify the correct answer for multiple choice and correct answers for multiple-select.
+
+    Do not use:
+    - Language such as "which of the following" instead directly ask "which statement" 
+    - Negative questions that include "NOT," "False," or "EXCEPT" (for example avoid a question like: "All of the following are true, except," or "which of the following is false?"
+    -answer choices that include: "None of the above" or "all of the above"
+
+    Style guides:
+    - US is the preferred abbreviation for the United States - not U.S.
+    - always use an Oxford comma
+
+    Make sure that each question item has a Header that begins with Gerund phrase (for example: Analyzing a Primary Source, or Identifying Cause and Effect)
+
+    For 6th grade audience lexile level should be 500-650, for 7th grade audience the lexile level should be 650-800, for a 9th grade audience the lexile level should be 800-1000 and for 10th grade audience the lexile level should be 900-1100.
+
+    >>>Lesson Blueprint:
+    {blueprint}
+
+    Provide the assessment items in a structured format with clear item numbers for later reference.
+    """
+    try:
+        response = assessment_model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        return f"Error generating assessment items: {str(e)}"
+
+# Generate button and workflow
 if st.button("Generate Lesson Blueprint"):
     if not lesson_info.strip():
         st.warning("Please enter lesson information to generate content.")
     else:
+        # Generate Lesson Blueprint
         with st.spinner("Generating lesson blueprint..."):
             blueprint_output = create_lesson_blueprint(lesson_info, additional_resources, reference_content)
-
-
-        st.subheader("Generated Lesson Blueprint")
-        st.write(blueprint_output)
+        
+        # Generate Assessment Items using the blueprint output
+        with st.spinner("Generating assessment items..."):
+            assessment_output = create_assessment_items(blueprint_output)
+        
+        # Display outputs in expandable sections
+        with st.expander("Generated Lesson Blueprint", expanded=True):
+            st.write(blueprint_output)
+        with st.expander("Generated Assessment Items", expanded=True):
+            st.write(assessment_output)
