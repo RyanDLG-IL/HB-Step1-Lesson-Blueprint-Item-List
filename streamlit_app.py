@@ -265,9 +265,8 @@ def create_assessment_items(blueprint):
     
     Example format for an item with feedback:
     
-    ## Instructional Segment 1 Item 1 (Objective 1, DOK Level 1)
-    
-    ### Identifying Geographic Features
+    **Instructional Segment 1 Item 1 (Objective 1, DOK Level 1)**
+    - Identifying Geographic Features
     
     Which statement correctly describes a key characteristic of Alabama's Coastal Plain region?
     
@@ -279,6 +278,9 @@ def create_assessment_items(blueprint):
     Correct Answer: C
     
     Feedback: The Coastal Plain region is defined by its low elevation and flat terrain near the Gulf of Mexico.
+    
+    ----
+    
     """
     try:
         response = assessment_model.generate_content(prompt)
