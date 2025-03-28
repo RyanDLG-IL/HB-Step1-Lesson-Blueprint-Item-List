@@ -103,6 +103,24 @@ def create_lesson_blueprint(lesson_info, additional_resources, reference_content
     ### Audience
     Instructional content developers, social studies teachers, and educational designers with familiarity in instructional methods and multimedia instructional tools. Assume moderate familiarity with social studies content but explicitly clarify complex concepts.
 
+    ### Student-Friendly Learning Goals Guidelines
+    Create student-friendly versions of the learning objectives that:
+    1. Start with the same verb as the original objective
+    2. Are significantly more concise (approximately half the length)
+    3. Remove repetitive location names or terminology in favor of more general phrasing
+    4. Maintain the core learning point
+    
+    Examples:
+    - Original: "Identify the primary geographic features of the Coastal Plain, Piedmont, and Appalachian regions in Alabama."
+      Student-friendly: "Identify geographic features of Alabama's key regions."
+    - Original: "Explain how variations in climate across Alabama's Coastal Plain, Piedmont, and Appalachian regions affect local agriculture."
+      Student-friendly: "Explain how climate variations affect agriculture in Alabama."
+    - Original: "Analyze ways that rivers and soils in Alabama's Coastal Plain, Piedmont, and Appalachian regions have historically supported trade and settlement."
+      Student-friendly: "Analyze how rivers and soils have historically supported trade and settlement."
+
+    ### Content Breakdown Guidelines
+    For the content breakdown in instructional sections, provide information as complete sentences, not fragments. This allows for direct copy/paste into instructional materials without manual adjustments.
+
     ### Response
     Provide the Lesson Blueprint in the following format:
 
@@ -113,7 +131,7 @@ def create_lesson_blueprint(lesson_info, additional_resources, reference_content
 
     **Lesson Learning Goals**  
     - Restate the provided learning objectives exactly as given.
-    - Rephrase each learning objective in student-friendly language.
+    - Rephrase each learning objective in student-friendly language following the guidelines provided.
 
     **Key Vocabulary**  
     - List 4–6 essential vocabulary terms students must understand to engage effectively with the lesson.
@@ -124,7 +142,7 @@ def create_lesson_blueprint(lesson_info, additional_resources, reference_content
     **Instruction Sections** (Segment logically based on provided objectives)  
     For each section include:
     - Clearly stated learning objective.
-    - Concise content breakdown, organized into logical subpoints.
+    - Concise content breakdown, organized into logical subpoints, using complete sentences.
     - Instructional supports (e.g., visual aids, interactive maps, multimedia recommendations).
     - Explicit attention to potential misconceptions or challenges students may encounter.
 
