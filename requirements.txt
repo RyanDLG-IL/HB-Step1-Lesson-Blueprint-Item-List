@@ -4,4 +4,4 @@ python-dotenv
 google-genai
 google-generativeai
 python-docx
-fitz
+PyMuPDF
