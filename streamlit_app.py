@@ -14,10 +14,10 @@ if not genai_api_key:
     st.stop()
 
 genai.configure(api_key=genai_api_key)
-# Existing model for generating lesson blueprints
+# Model instances
 blueprint_model = genai.GenerativeModel("gemini-1.5-flash")
-# New model instance for generating assessment items (change model name as needed)
 assessment_model = genai.GenerativeModel("gemini-1.5-flash")
+media_model = genai.GenerativeModel("gemini-1.5-flash")  # New instance for media suggestions
 
 # Helper functions
 def extract_text_from_pdf(pdf_path):
@@ -59,11 +59,11 @@ reference_content = load_reference_materials(reference_materials_folder)
 
 # Streamlit page setup
 st.set_page_config(page_title="Lesson Blueprint Generator", layout="centered")
-st.title("Lesson Blueprint and Item Generator")
+st.title("Lesson Blueprint, Assessment, and Media Suggestion Generator")
 
 # User inputs
 lesson_info = st.text_area("Enter Lesson Information (title, description, lesson question, and learning objectives):")
-additional_resources = st.text_area("Enter Additional Resources such as websites or additional content (optional):")
+additional_resources = st.text_area("Enter any additional resources such as websites or additional content (optional):")
 
 # Instruction prompt for Lesson Blueprint Generation
 def create_lesson_blueprint(lesson_info, additional_resources, reference_content):
@@ -154,15 +154,15 @@ def create_assessment_items(blueprint):
     All question items should identify the correct answer for multiple choice and correct answers for multiple-select.
 
     Do not use:
-    - Language such as "which of the following" instead directly ask "which statement" 
-    - Negative questions that include "NOT," "False," or "EXCEPT" (for example avoid a question like: "All of the following are true, except," or "which of the following is false?"
-    -answer choices that include: "None of the above" or "all of the above"
+    - Language such as "which of the following" rather directly ask "which statement" 
+    - Negative questions that include "NOT," "False," or "EXCEPT" 
+    - Answer choices that include: "None of the above" or "all of the above"
 
     Style guides:
     - US is the preferred abbreviation for the United States - not U.S.
-    - always use an Oxford comma
+    - Always use an Oxford comma
 
-    Make sure that each question item has a Header that begins with Gerund phrase (for example: Analyzing a Primary Source, or Identifying Cause and Effect)
+    Make sure that each question item has a Header that begins with a Gerund phrase (for example: Analyzing a Primary Source, or Identifying Cause and Effect)
 
     For 6th grade audience lexile level should be 500-650, for 7th grade audience the lexile level should be 650-800, for a 9th grade audience the lexile level should be 800-1000 and for 10th grade audience the lexile level should be 900-1100.
 
@@ -214,11 +214,11 @@ def create_assessment_items(blueprint):
 
     Correct Answers: B, C
 
-    Hint: Think about how people and goods traveled before cars and trains were invented. Also consider where cities are often located.
+    Hint: Think about how people and goods traveled before cars and trains were invented, and where cities are often located.
     
     ----
     
-    [continue with remiaing items in a similar structure]
+    [continue with remaining items in a similar structure]
     
     """
     try:
@@ -226,6 +226,42 @@ def create_assessment_items(blueprint):
         return response.text.strip()
     except Exception as e:
         return f"Error generating assessment items: {str(e)}"
+
+# Instruction prompt for Media Suggestions Generation
+def create_media_suggestions(blueprint, assessment):
+    prompt = f"""
+    ## Context ##
+    You are assisting a content developer who creates online educational lessons for social studies. The lessons follow structured lesson blueprints that include clear learning goals, objectives, vocabulary, warm-up activities, instruction sections, and assessments. You will specifically identify visual media (primarily maps, photos, satellite imagery, historical images) relevant to lesson content. All media recommendations must prioritize open-source or free-to-use images. Rather than providing URLs, offer detailed descriptions of images that can guide the content development team in finding or creating the visual media. All descriptions must comply with provided Diversity, Equity, and Inclusion (DEI) guidelines, emphasizing diverse and equitable representation.
+
+    ## Objective ##
+    Provide detailed, authentic descriptions of visual media suggestions aligned explicitly with provided lesson blueprint content and assessments. Include recommended placement in lesson sections or associated assessment items (including the specific item number(s)). Ensure descriptions are clear enough to guide the content development team in effectively sourcing or creating the media.
+
+    ## Style ##
+    Structured, concise, and actionable. Clearly separate each description with detailed reasoning for alignment with lesson content, instructional goals, and DEI compliance.
+
+    ## Tone ##
+    Professional, supportive, and inclusive. Descriptions should clearly reflect cultural awareness, equity, and educational relevance.
+
+    ## Audience ##
+    Educational content developers, instructional designers, and educators familiar with social studies curriculum development and DEI standards.
+
+    ## Response ##
+    Present your detailed image descriptions in a structured table with the following headers:
+
+    | Lesson Section or Assessment Item (include item number if applicable) | Media Type (Image/Map/Satellite Imagery/Video) | Detailed Description (clear, actionable, linked to lesson goals and DEI) |
+    |-----------------------------------------------------------------------|-------------------------------------------------|--------------------------------------------------------------------------|
+
+    ### Provided Lesson Blueprint:
+    {blueprint}
+
+    ### Provided Assessment Items:
+    {assessment}
+    """
+    try:
+        response = media_model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        return f"Error generating media suggestions: {str(e)}"
 
 # Generate button and workflow
 if st.button("Generate Content"):
@@ -240,8 +276,14 @@ if st.button("Generate Content"):
         with st.spinner("Generating assessment items..."):
             assessment_output = create_assessment_items(blueprint_output)
         
+        # Generate Media Suggestions using both blueprint and assessment outputs
+        with st.spinner("Generating media suggestions..."):
+            media_output = create_media_suggestions(blueprint_output, assessment_output)
+        
         # Display outputs in expandable sections
         with st.expander("Generated Lesson Blueprint", expanded=True):
             st.write(blueprint_output)
         with st.expander("Generated Assessment Items", expanded=True):
             st.write(assessment_output)
+        with st.expander("Generated Media Suggestions", expanded=True):
+            st.write(media_output)
