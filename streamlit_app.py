@@ -59,11 +59,11 @@ reference_content = load_reference_materials(reference_materials_folder)
 
 # Streamlit page setup
 st.set_page_config(page_title="Lesson Blueprint Generator", layout="centered")
-st.title("Lesson Blueprint Generator")
+st.title("Lesson Blueprint and Item Generator")
 
 # User inputs
 lesson_info = st.text_area("Enter Lesson Information (title, description, lesson question, and learning objectives):")
-additional_resources = st.text_area("Enter Additional Resources (optional):")
+additional_resources = st.text_area("Enter Additional Resources such as websites or additional content (optional):")
 
 # Instruction prompt for Lesson Blueprint Generation
 def create_lesson_blueprint(lesson_info, additional_resources, reference_content):
@@ -170,6 +170,56 @@ def create_assessment_items(blueprint):
     {blueprint}
 
     Provide the assessment items in a structured format with clear item numbers for later reference.
+    
+    $$EXMAPLE$$
+    1. Identifying Geographic Features
+
+    Which statement correctly describes a key characteristic of Alabama's Coastal Plain region?
+
+    A. It's a mountainous region with diverse flora and fauna. 
+    B. It features rolling hills and fertile valleys. 
+    C. It's characterized by flat, low-lying land with sandy soil and swamps. 
+    D. It has high elevations and a cooler climate than other regions.
+
+    Correct Answer: C
+
+    Hint: Think about the words "flat," "low-lying," and what kind of soil is common near beaches.
+    
+    ----
+
+    2. Analyzing Climate and Agriculture
+
+    Which statement best explains how climate affects agriculture in Alabama's Piedmont region?
+
+    A. The long growing season allows for the cultivation of a limited range of crops, primarily cotton. 
+    B. The warm, humid climate is ideal for growing only peanuts and soybeans. 
+    C. The cooler and drier climate supports a variety of crops, including fruits and vegetables. 
+    D. The short growing season restricts agricultural production to hardy mountain crops.
+
+    Correct Answer: C
+
+    Hint: Consider what types of crops grow well in areas that aren't as hot and humid as the coastal areas.
+    
+    ----
+
+    3. Evaluating the Impact of Rivers
+
+    Which two statements accurately reflect the historical importance of Alabama's rivers?
+
+    A. Rivers have played a minor role in the state's economic development. 
+    B. Rivers served as significant transportation routes for trade and goods movement. 
+    C. Rivers significantly impacted patterns of settlement and the growth of cities. 
+    D. Rivers had minimal influence on the early development of the state. 
+    E. Rivers provided an abundant supply of fresh water for agricultural purposes.
+
+    Correct Answers: B, C
+
+    Hint: Think about how people and goods traveled before cars and trains were invented. Also consider where cities are often located.
+    
+    ----
+    
+    [continue with remiaing items in a similar structure]
+    
     """
     try:
         response = assessment_model.generate_content(prompt)
@@ -178,7 +228,7 @@ def create_assessment_items(blueprint):
         return f"Error generating assessment items: {str(e)}"
 
 # Generate button and workflow
-if st.button("Generate Lesson Blueprint"):
+if st.button("Generate Content"):
     if not lesson_info.strip():
         st.warning("Please enter lesson information to generate content.")
     else:
