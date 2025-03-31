@@ -80,7 +80,7 @@ def create_lesson_blueprint(lesson_info, additional_resources, reference_content
     - A restatement of the provided lesson question.
     - A restatement of the provided learning objectives.
     - A rephrased version of each learning objective in student-friendly language.
-    - Identification of key vocabulary terms (4–6 words) essential for understanding the lesson content.
+    - Identification of key vocabulary terms (4–6 words) essential for understanding the lesson content, each with a definition.
     - A warm-up section designed to activate prior knowledge and engage students.
     - Clearly segmented instructional sections aligned with each learning objective provided, including:
         - Clearly stated learning objectives.
@@ -118,6 +118,18 @@ def create_lesson_blueprint(lesson_info, additional_resources, reference_content
     - Original: "Analyze ways that rivers and soils in Alabama's Coastal Plain, Piedmont, and Appalachian regions have historically supported trade and settlement."
       Student-friendly: "Analyze how rivers and soils have historically supported trade and settlement."
 
+    ### Vocabulary Definition Guidelines
+    For each vocabulary term, provide a definition that:
+    1. Is written as a short phrase with no starting capital letters and no end punctuation
+    2. Is consistent with the vocabulary term's part of speech
+    3. Is clear and concise enough for the target grade level
+    4. Directly relates to how the term is used in the lesson content
+
+    Examples:
+    - industrialization: process of developing industries and manufacturing in a country or region
+    - tariff: tax on imported goods designed to protect domestic industries
+    - amendment: change or addition to a legal document such as the Constitution
+    
     ### Content Breakdown Guidelines
     For the content breakdown in instructional sections, provide information as complete sentences, not fragments. This allows for direct copy/paste into instructional materials without manual adjustments.
 
@@ -134,7 +146,7 @@ def create_lesson_blueprint(lesson_info, additional_resources, reference_content
     - Rephrase each learning objective in student-friendly language following the guidelines provided.
 
     **Key Vocabulary**  
-    - List 4–6 essential vocabulary terms students must understand to engage effectively with the lesson.
+    - List 4–6 essential vocabulary terms with definitions. Format each as: term: definition (no capitals at beginning of definition, no ending punctuation)
 
     **Warm-Up**  
     - Brief, engaging introduction designed to activate prior knowledge related to the lesson.
