@@ -124,6 +124,7 @@ def get_prompt(blueprint):
     **Instructional Segment 1 Item 1 (Objective 1, DOK Level 1)**
     - Identifying Geographic Features
     
+    
     Which statement correctly describes a key characteristic of Alabama's Coastal Plain region?
     
     A. It's a mountainous region with diverse flora and fauna. 
@@ -134,4 +135,5 @@ def get_prompt(blueprint):
     Correct Answer: C
     
     Feedback: The Coastal Plain region is defined by its low elevation and flat terrain near the Gulf of Mexico.
+    ----
     """

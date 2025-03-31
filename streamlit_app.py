@@ -9,6 +9,7 @@ from docx.shared import Pt
 from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 import re
 import zipfile  # Add this import at the top of your file
+import threading  # Add this import for threading
 
 # Import the prompt function from the prompts directory
 from prompts.lesson_blueprint_prompt import get_prompt
@@ -142,17 +143,13 @@ dei_reference_content = load_dei_reference_materials(reference_materials_folder)
 blueprint_reference_content = load_blueprint_reference(reference_materials_folder)
 
 # Streamlit page setup
-st.set_page_config(page_title="Lesson Blueprint Generator", layout="centered")
+st.set_page_config(page_title="Lesson Blueprint Generator", layout="wide")
 st.title("Lesson Blueprint, Assessment, and Media Suggestion Generator")
 
 # Input fields
 lesson_title = st.text_input("Lesson Title", key="lesson_title")
-lesson_info = st.text_area("Lesson Information", 
-                          "Enter lesson description, question, and learning objectives here.", 
-                          height=200)
-additional_resources = st.text_area("Additional Resources", 
-                                  "Enter any additional resources or notes here.", 
-                                  height=100)
+lesson_info = st.text_area("Lesson Information", height=200)
+additional_resources = st.text_area("Additional Resources", height=100)
 
 
 # Instruction prompt for Lesson Blueprint Generation
@@ -354,12 +351,13 @@ def create_zip_with_all_docs(blueprint_doc, assessment_doc, media_doc, reports_d
     zip_buffer.seek(0)
     return zip_buffer
 
-# Generate button and workflow
-col1, col2 = st.columns([3, 1])
-with col1:
-    generate_button = st.button("Generate Content")
-with col2:
-    reset_button = st.button("Reset", on_click=reset_outputs)
+# Add sidebar buttons for generation and reset
+st.sidebar.title("Controls")
+generate_button = st.sidebar.button("Generate Content", use_container_width=True, key="generate_btn")
+reset_button = st.sidebar.button("Reset Tool", on_click=reset_outputs, use_container_width=True, key="reset_btn")
+
+# Add a separator between controls and download options
+st.sidebar.markdown("---")
 
 # Update your content generation workflow
 if generate_button:
@@ -381,38 +379,56 @@ if generate_button:
         with st.spinner("Generating media suggestions..."):
             st.session_state.media_output = create_media_suggestions(st.session_state.blueprint_output, st.session_state.assessment_output)
         
-        # Run fact check and DEI checks in parallel
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            with st.spinner("Running fact check..."):
-                st.session_state.fact_check_output = create_fact_check(
-                    st.session_state.blueprint_output, 
-                    st.session_state.assessment_output, 
-                    st.session_state.media_output
+        # Replace the threading section with this fixed implementation
+        # Show a single spinner while both checks run
+        with st.spinner("Running fact check and DEI check in parallel..."):
+            # Store local variables for the threads to work with
+            blueprint_content = st.session_state.blueprint_output
+            assessment_content = st.session_state.assessment_output
+            media_content = st.session_state.media_output
+            
+            # Use lists to store results (mutable objects that can be modified by threads)
+            fact_check_result = [None]
+            dei_check_result = [None]
+
+            # Define thread functions that don't access session state
+            def run_fact_check():
+                fact_check_result[0] = create_fact_check(
+                    blueprint_content,  # Use local variables instead of session_state
+                    assessment_content, 
+                    media_content
                 )
-                
-        with col2:
-            with st.spinner("Running DEI check..."):
-                st.session_state.dei_check_output = create_dei_check(
-                    st.session_state.blueprint_output, 
-                    st.session_state.assessment_output, 
-                    st.session_state.media_output
+
+            def run_dei_check():
+                dei_check_result[0] = create_dei_check(
+                    blueprint_content,  # Use local variables instead of session_state
+                    assessment_content, 
+                    media_content
                 )
+
+            # Create and start both threads
+            fact_check_thread = threading.Thread(target=run_fact_check)
+            dei_check_thread = threading.Thread(target=run_dei_check)
+            fact_check_thread.start()
+            dei_check_thread.start()
+
+            # Wait for both to complete
+            fact_check_thread.join()
+            dei_check_thread.join()
+
+            # Now that threads are done, save results to session state in main thread
+            st.session_state.fact_check_output = fact_check_result[0]
+            st.session_state.dei_check_output = dei_check_result[0]
         
         # Set flag that content has been generated
         st.session_state.has_generated = True
         
-        # Use the current rerun method instead of experimental_rerun
+        # Use the current rerun method
         st.rerun()
 
 # Display outputs if they exist
 if st.session_state.has_generated:
-    # Add a separator before download options
-    st.markdown("---")
-    st.markdown("### Download Options")
-
-    # Create the four requested document files
+    # Create document files
     blueprint_doc = create_word_doc("Lesson Blueprint", st.session_state.blueprint_output)
     assessment_doc = create_word_doc("Assessment Items", st.session_state.assessment_output)
     media_doc = create_word_doc("Media Suggestions", st.session_state.media_output)
@@ -421,73 +437,114 @@ if st.session_state.has_generated:
         f"## Fact Check Report\n\n{st.session_state.fact_check_output}\n\n## DEI Check Report\n\n{st.session_state.dei_check_output}"
     )
     
-    # Create zip file with all documents - use existing document buffers
+    # Create zip file with all documents
     all_docs_zip = create_zip_with_all_docs(
         blueprint_doc,
         assessment_doc,
         media_doc,
         reports_doc
     )
-
-    # Add download buttons in a 5x1 grid for better layout
-    col1, col2, col3, col4, col5 = st.columns(5)
-
-    with col1:
-        st.download_button(
-            label="Download All",
-            data=all_docs_zip,
-            file_name="All_Lesson_Materials.zip",
-            mime="application/zip",
-            key="all_docs_download"
-        )
     
-    with col2:
-        st.download_button(
-            label="Lesson Blueprint",
-            data=blueprint_doc,
-            file_name="Lesson_Blueprint.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            key="blueprint_download"
-        )
-    with col3:    
-        st.download_button(
-            label="Assessment Items",
-            data=assessment_doc,
-            file_name="Assessment_Items.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            key="assessment_download"
-        )
-    with col4:
-        st.download_button(
-            label="Media Suggestions",
-            data=media_doc,
-            file_name="Media_Suggestions.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            key="media_download"
-        )
-    with col5:    
-        st.download_button(
-            label="Reports",
-            data=reports_doc,
-            file_name="DEI_Fact_Check_Reports.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            key="reports_download"
-        )
+    # 1. SIDEBAR DOWNLOAD OPTIONS
+    st.sidebar.markdown("### Download Options")
+    
+    # Make the Download All button visually distinct
+    st.sidebar.markdown("""
+    <style>
+    div.stDownloadButton > button {
+        background-color: #4CAF50 !important;
+        color: white !important;
+        font-weight: bold !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Download All button (with unique key to apply style)
+    st.sidebar.download_button(
+        label="💾 Download All Materials",
+        data=all_docs_zip,
+        file_name="All_Lesson_Materials.zip",
+        mime="application/zip",
+        key="all_docs_download",
+        use_container_width=True
+    )
+    
+    # Reset the style for other buttons
+    st.sidebar.markdown("""
+    <style>
+    div.stDownloadButton > button {
+        background-color: inherit !important;
+        color: inherit !important;
+        font-weight: normal !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Individual download buttons, one per row
+    st.sidebar.download_button(
+        label="Lesson Blueprint",
+        data=blueprint_doc,
+        file_name="Lesson_Blueprint.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        key="blueprint_download",
+        use_container_width=True
+    )
+    
+    st.sidebar.download_button(
+        label="Assessment Items",
+        data=assessment_doc,
+        file_name="Assessment_Items.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        key="assessment_download",
+        use_container_width=True
+    )
+    
+    st.sidebar.download_button(
+        label="Media Suggestions",
+        data=media_doc,
+        file_name="Media_Suggestions.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        key="media_download",
+        use_container_width=True
+    )
+    
+    st.sidebar.download_button(
+        label="DEI & Fact Check Reports",
+        data=reports_doc,
+        file_name="DEI_Fact_Check_Reports.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        key="reports_download",
+        use_container_width=True
+    )
     
     st.markdown("---")
+    st.header("Generated Content")
     
-    # Display all outputs in expandable sections
-    with st.expander("Generated Lesson Blueprint", expanded=True):
+    # 2. CONTENT IN TABS
+    # Create tabs for each content type
+    blueprint_tab, assessment_tab, media_tab, fact_check_tab, dei_check_tab = st.tabs([
+        "Lesson Blueprint", 
+        "Assessment Items", 
+        "Media Suggestions", 
+        "Fact Check", 
+        "DEI Check"
+    ])
+    
+    # Display content in each tab
+    with blueprint_tab:
+        st.markdown("## Lesson Blueprint")
         st.write(st.session_state.blueprint_output)
-        
-    with st.expander("Generated Assessment Items", expanded=True):
+    
+    with assessment_tab:
+        st.markdown("## Assessment Items")
         st.write(st.session_state.assessment_output)
-        
-    with st.expander("Generated Media Suggestions", expanded=True):
+    
+    with media_tab:
+        st.markdown("## Media Suggestions")
         st.write(st.session_state.media_output)
-        
-    with st.expander("Fact Check Report", expanded=True):
+    
+    with fact_check_tab:
         st.write(st.session_state.fact_check_output)
-        
-    with st.expander("DEI Check Report", expanded=True):
+    
+    with dei_check_tab:
         st.write(st.session_state.dei_check_output)
