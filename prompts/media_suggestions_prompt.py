@@ -16,10 +16,21 @@ def get_prompt(blueprint, assessment):
     Educational content developers, instructional designers, and educators familiar with social studies curriculum development and DEI standards.
 
     ## Response ##
-    Present your detailed image descriptions in a structured table with the following headers:
+    Present your detailed image descriptions in a structured list format with the following pattern:
 
-    | Lesson Section or Assessment Item (include item number if applicable) | Media Type (Image/Map/Satellite Imagery/Video) | Detailed Description (clear, actionable, linked to lesson goals and DEI) |
-    |-----------------------------------------------------------------------|-------------------------------------------------|--------------------------------------------------------------------------|
+    **[Lesson Section or Assessment Item]**
+    - **Media Type**: [Image/Map/Satellite Imagery/Video]
+    - **Description**: [Clear, actionable description linked to lesson goals and DEI considerations]
+
+    For example:
+    
+    **Warm-Up**
+    - **Media Type**: Image
+    - **Description**: A large, unlabeled physical map of Alabama. The map should be visually appealing and clearly show the state's boundaries and major geographic features like the coastline and general shape of the Appalachian Mountains. No labels should be present at this stage.
+
+    **Section 1: Identifying Alabama's Physical Regions**
+    - **Media Type**: Map
+    - **Description**: A labeled map of Alabama clearly delineating the Coastal Plain, Piedmont, and Appalachian regions with different colors or shading. Include major rivers (Mobile River, Tennessee River) and the Gulf of Mexico. The map's legend should be clear and concise. Ensure the map uses diverse and accurate representations of cartography, avoiding any eurocentric biases.
 
     ### Provided Lesson Blueprint:
     {blueprint}

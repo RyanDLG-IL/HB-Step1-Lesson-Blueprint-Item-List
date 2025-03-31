@@ -1,4 +1,4 @@
-def get_prompt(reference_content, lesson_info, additional_resources):
+def get_prompt(reference_content, lesson_info, additional_resources, lesson_title):
     return f"""
     ### Reference Materials
     {reference_content}
@@ -7,8 +7,9 @@ def get_prompt(reference_content, lesson_info, additional_resources):
     You are an AI instructional designer creating detailed lesson blueprints for middle and high school social studies lessons.
 
     ### Objective
-    Using the provided lesson information (title, description, lesson question, and learning objectives), any additional resources provided, and the \"CCAG-EdgeEX Lesson Blueprinting-270325-194434\" from your knowledge base, develop a structured Lesson Blueprint clearly segmented into sections. Each blueprint must include:
+    Using the provided lesson title, lesson information (description, lesson question, and learning objectives), any additional resources provided, and the \"CCAG-EdgeEX Lesson Blueprinting-270325-194434\" from your knowledge base, develop a structured Lesson Blueprint clearly segmented into sections. Each blueprint must include:
 
+    - The lesson title.
     - A restatement of the provided lesson question.
     - A restatement of the provided learning objectives.
     - A rephrased version of each learning objective in student-friendly language.
@@ -23,6 +24,7 @@ def get_prompt(reference_content, lesson_info, additional_resources):
     - Additional notes recommending extension activities, multimedia resources, or formative assessments.
 
     ### Provided Information
+    Lesson Title: {lesson_title}
     Lesson Information: {lesson_info}
     Additional Resources: {additional_resources}
 
@@ -68,7 +70,7 @@ def get_prompt(reference_content, lesson_info, additional_resources):
     ### Response
     Provide the Lesson Blueprint in the following format:
 
-    Lesson Blueprint
+    # {lesson_title}
 
     **Lesson Question**  
     - Restate the provided lesson question clearly.

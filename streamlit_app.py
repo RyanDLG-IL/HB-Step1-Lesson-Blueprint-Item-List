@@ -4,6 +4,11 @@ import fitz as pymupdf
 from docx import Document
 from dotenv import load_dotenv
 import google.generativeai as genai
+from io import BytesIO
+from docx.shared import Pt
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+import re
+import zipfile  # Add this import at the top of your file
 
 # Import the prompt function from the prompts directory
 from prompts.lesson_blueprint_prompt import get_prompt
@@ -28,6 +33,30 @@ assessment_model = genai.GenerativeModel("gemini-1.5-flash")
 media_model = genai.GenerativeModel("gemini-1.5-flash")  
 fact_check_model = genai.GenerativeModel("gemini-1.5-flash")  
 dei_check_model = genai.GenerativeModel("gemini-1.5-flash") 
+
+
+# Initialize session state variables if they don't exist
+if 'blueprint_output' not in st.session_state:
+    st.session_state.blueprint_output = None
+if 'assessment_output' not in st.session_state:
+    st.session_state.assessment_output = None
+if 'media_output' not in st.session_state:
+    st.session_state.media_output = None
+if 'fact_check_output' not in st.session_state:
+    st.session_state.fact_check_output = None
+if 'dei_check_output' not in st.session_state:
+    st.session_state.dei_check_output = None
+if 'has_generated' not in st.session_state:
+    st.session_state.has_generated = False
+
+# Add reset function
+def reset_outputs():
+    st.session_state.blueprint_output = None
+    st.session_state.assessment_output = None
+    st.session_state.media_output = None
+    st.session_state.fact_check_output = None
+    st.session_state.dei_check_output = None
+    st.session_state.has_generated = False
 
 
 # Helper functions
@@ -116,15 +145,20 @@ blueprint_reference_content = load_blueprint_reference(reference_materials_folde
 st.set_page_config(page_title="Lesson Blueprint Generator", layout="centered")
 st.title("Lesson Blueprint, Assessment, and Media Suggestion Generator")
 
-# User inputs
-lesson_info = st.text_area("Enter Lesson Information (title, description, lesson question, and learning objectives):")
-additional_resources = st.text_area("Enter any additional resources such as websites or additional content (optional):")
+# Input fields
+lesson_title = st.text_input("Lesson Title", key="lesson_title")
+lesson_info = st.text_area("Lesson Information", 
+                          "Enter lesson description, question, and learning objectives here.", 
+                          height=200)
+additional_resources = st.text_area("Additional Resources", 
+                                  "Enter any additional resources or notes here.", 
+                                  height=100)
 
 
 # Instruction prompt for Lesson Blueprint Generation
-def create_lesson_blueprint(lesson_info, additional_resources, blueprint_reference_content):
+def create_lesson_blueprint(lesson_title, lesson_info, additional_resources, blueprint_reference_content):
     # Get the prompt from the imported function, using the specific blueprint reference
-    prompt = get_prompt(blueprint_reference_content, lesson_info, additional_resources)
+    prompt = get_prompt(blueprint_reference_content, lesson_info, additional_resources, lesson_title)
     
     # Add DEI reference materials to consider
     prompt += f"""
@@ -202,44 +236,258 @@ def create_dei_check(blueprint, assessment, media_suggestions):
     except Exception as e:
         return f"Error generating DEI check: {str(e)}"
 
+# Function to create a Word document
+def create_word_doc(title, content):
+    doc = Document()
+    # Add title with formatting
+    title_heading = doc.add_heading(title, level=1)
+    title_heading.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    
+    # Split content into paragraphs
+    paragraphs = content.split('\n')
+    
+    # Flag to track if we're inside a table
+    in_table = False
+    table_rows = []
+    
+    i = 0
+    while i < len(paragraphs):
+        para = paragraphs[i]
+        if not para.strip():
+            i += 1
+            continue
+        
+        # Check for table start (line contains | and the next line has dashes and |)
+        if '|' in para and i + 1 < len(paragraphs) and set(paragraphs[i+1].replace('|', '')).issubset({'-', ' '}):
+            in_table = True
+            table_rows = []
+            
+            # Add header row
+            header_cells = [cell.strip() for cell in para.split('|')[1:-1]] if para.strip().startswith('|') else [cell.strip() for cell in para.split('|')]
+            table_rows.append(header_cells)
+            
+            # Skip the separator row
+            i += 2  # Move past header and separator lines
+            
+            # Process table rows
+            while i < len(paragraphs) and '|' in paragraphs[i]:
+                row = paragraphs[i]
+                row_cells = [cell.strip() for cell in row.split('|')[1:-1]] if row.strip().startswith('|') else [cell.strip() for cell in row.split('|')]
+                table_rows.append(row_cells)
+                i += 1
+            
+            # Create the Word table
+            if table_rows:
+                max_cols = max(len(row) for row in table_rows)
+                word_table = doc.add_table(rows=len(table_rows), cols=max_cols)
+                word_table.style = 'Table Grid'
+                
+                # Fill the table
+                for row_idx, row_data in enumerate(table_rows):
+                    for col_idx, cell_text in enumerate(row_data):
+                        if col_idx < max_cols:  # Ensure we don't exceed column count
+                            cell = word_table.cell(row_idx, col_idx)
+                            cell.text = cell_text
+                            
+                            # Make header row bold
+                            if row_idx == 0:
+                                for paragraph in cell.paragraphs:
+                                    for run in paragraph.runs:
+                                        run.bold = True
+                
+                # Add space after table
+                doc.add_paragraph()
+            
+            in_table = False
+            continue
+            
+        # Check if paragraph is a header (markdown style)
+        header_match = re.match(r'^#+\s+(.+)$', para)
+        if header_match:
+            header_text = header_match.group(1)
+            level = min(len(re.match(r'^#+', para).group(0)), 6)
+            doc.add_heading(header_text, level=level)
+            i += 1
+            continue
+            
+        # Check if paragraph is a list item
+        if para.strip().startswith('- ') or para.strip().startswith('* '):
+            doc.add_paragraph(para.strip()[2:], style='List Bullet')
+            i += 1
+            continue
+            
+        # Handle bolded text with markdown ** or __
+        bold_pattern = r'\*\*(.*?)\*\*|__(.*?)__'
+        if re.search(bold_pattern, para):
+            p = doc.add_paragraph()
+            parts = re.split(bold_pattern, para)
+            for j, part in enumerate(parts):
+                if part:  # Skip empty parts
+                    if j % 3 == 1 or j % 3 == 2:  # Every third part matches the bold pattern
+                        p.add_run(part).bold = True
+                    else:
+                        p.add_run(part)
+            i += 1
+            continue
+            
+        # Regular paragraph
+        doc.add_paragraph(para)
+        i += 1
+    
+    # Save to buffer
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
+
+# Modify this function to accept existing document buffers instead of recreating them
+def create_zip_with_all_docs(blueprint_doc, assessment_doc, media_doc, reports_doc):
+    # Create a ZIP file in memory
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'a', zipfile.ZIP_DEFLATED) as zip_file:
+        # Add each document to the zip file
+        zip_file.writestr("Lesson_Blueprint.docx", blueprint_doc.getvalue())
+        zip_file.writestr("Assessment_Items.docx", assessment_doc.getvalue())
+        zip_file.writestr("Media_Suggestions.docx", media_doc.getvalue())
+        zip_file.writestr("DEI_Fact_Check_Reports.docx", reports_doc.getvalue())
+    
+    zip_buffer.seek(0)
+    return zip_buffer
+
 # Generate button and workflow
-if st.button("Generate Content"):
-    if not lesson_info.strip():
-        st.warning("Please enter lesson information to generate content.")
+col1, col2 = st.columns([3, 1])
+with col1:
+    generate_button = st.button("Generate Content")
+with col2:
+    reset_button = st.button("Reset", on_click=reset_outputs)
+
+# Update your content generation workflow
+if generate_button:
+    if not lesson_info.strip() or not lesson_title.strip():
+        st.warning("Please enter both lesson title and information to generate content.")
     else:
         # Generate primary content
         with st.spinner("Generating lesson blueprint..."):
-            blueprint_output = create_lesson_blueprint(lesson_info, additional_resources, blueprint_reference_content)
+            st.session_state.blueprint_output = create_lesson_blueprint(
+                lesson_title,
+                lesson_info, 
+                additional_resources, 
+                blueprint_reference_content
+            )
         
         with st.spinner("Generating assessment items..."):
-            assessment_output = create_assessment_items(blueprint_output)
+            st.session_state.assessment_output = create_assessment_items(st.session_state.blueprint_output)
         
         with st.spinner("Generating media suggestions..."):
-            media_output = create_media_suggestions(blueprint_output, assessment_output)
+            st.session_state.media_output = create_media_suggestions(st.session_state.blueprint_output, st.session_state.assessment_output)
         
         # Run fact check and DEI checks in parallel
         col1, col2 = st.columns(2)
         
         with col1:
             with st.spinner("Running fact check..."):
-                fact_check_output = create_fact_check(blueprint_output, assessment_output, media_output)
+                st.session_state.fact_check_output = create_fact_check(
+                    st.session_state.blueprint_output, 
+                    st.session_state.assessment_output, 
+                    st.session_state.media_output
+                )
                 
         with col2:
             with st.spinner("Running DEI check..."):
-                dei_check_output = create_dei_check(blueprint_output, assessment_output, media_output)
+                st.session_state.dei_check_output = create_dei_check(
+                    st.session_state.blueprint_output, 
+                    st.session_state.assessment_output, 
+                    st.session_state.media_output
+                )
         
-        # Display all outputs in expandable sections
-        with st.expander("Generated Lesson Blueprint", expanded=True):
-            st.write(blueprint_output)
-            
-        with st.expander("Generated Assessment Items", expanded=True):
-            st.write(assessment_output)
-            
-        with st.expander("Generated Media Suggestions", expanded=True):
-            st.write(media_output)
-            
-        with st.expander("Fact Check Report", expanded=True):
-            st.write(fact_check_output)
-            
-        with st.expander("DEI Check Report", expanded=True):
-            st.write(dei_check_output)
+        # Set flag that content has been generated
+        st.session_state.has_generated = True
+        
+        # Use the current rerun method instead of experimental_rerun
+        st.rerun()
+
+# Display outputs if they exist
+if st.session_state.has_generated:
+    # Add a separator before download options
+    st.markdown("---")
+    st.markdown("### Download Options")
+
+    # Create the four requested document files
+    blueprint_doc = create_word_doc("Lesson Blueprint", st.session_state.blueprint_output)
+    assessment_doc = create_word_doc("Assessment Items", st.session_state.assessment_output)
+    media_doc = create_word_doc("Media Suggestions", st.session_state.media_output)
+    reports_doc = create_word_doc(
+        "DEI and Fact-check Reports", 
+        f"## Fact Check Report\n\n{st.session_state.fact_check_output}\n\n## DEI Check Report\n\n{st.session_state.dei_check_output}"
+    )
+    
+    # Create zip file with all documents - use existing document buffers
+    all_docs_zip = create_zip_with_all_docs(
+        blueprint_doc,
+        assessment_doc,
+        media_doc,
+        reports_doc
+    )
+
+    # Add download buttons in a 5x1 grid for better layout
+    col1, col2, col3, col4, col5 = st.columns(5)
+
+    with col1:
+        st.download_button(
+            label="Download All",
+            data=all_docs_zip,
+            file_name="All_Lesson_Materials.zip",
+            mime="application/zip",
+            key="all_docs_download"
+        )
+    
+    with col2:
+        st.download_button(
+            label="Lesson Blueprint",
+            data=blueprint_doc,
+            file_name="Lesson_Blueprint.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key="blueprint_download"
+        )
+    with col3:    
+        st.download_button(
+            label="Assessment Items",
+            data=assessment_doc,
+            file_name="Assessment_Items.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key="assessment_download"
+        )
+    with col4:
+        st.download_button(
+            label="Media Suggestions",
+            data=media_doc,
+            file_name="Media_Suggestions.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key="media_download"
+        )
+    with col5:    
+        st.download_button(
+            label="Reports",
+            data=reports_doc,
+            file_name="DEI_Fact_Check_Reports.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            key="reports_download"
+        )
+    
+    st.markdown("---")
+    
+    # Display all outputs in expandable sections
+    with st.expander("Generated Lesson Blueprint", expanded=True):
+        st.write(st.session_state.blueprint_output)
+        
+    with st.expander("Generated Assessment Items", expanded=True):
+        st.write(st.session_state.assessment_output)
+        
+    with st.expander("Generated Media Suggestions", expanded=True):
+        st.write(st.session_state.media_output)
+        
+    with st.expander("Fact Check Report", expanded=True):
+        st.write(st.session_state.fact_check_output)
+        
+    with st.expander("DEI Check Report", expanded=True):
+        st.write(st.session_state.dei_check_output)
